@@ -37,6 +37,7 @@ export type SolarSystemConnection = {
   mass_status: MassState;
   ship_size_type: ShipSizeStatus;
   locked: boolean;
+  locked_reason?: string | null;
 
   source: string;
   target: string;

@@ -63,6 +63,7 @@ defmodule WandererApp.Api.MapConnection do
       :count_of_passage,
       :locked,
       :locked_at,
+      :locked_reason,
       :custom_info
     ])
 
@@ -115,6 +116,7 @@ defmodule WandererApp.Api.MapConnection do
       :wormhole_type,
       :count_of_passage,
       :locked,
+      :locked_reason,
       :custom_info
     ]
 
@@ -132,6 +134,7 @@ defmodule WandererApp.Api.MapConnection do
         :wormhole_type,
         :count_of_passage,
         :locked,
+        :locked_reason,
         :custom_info
       ]
 
@@ -159,6 +162,7 @@ defmodule WandererApp.Api.MapConnection do
         :wormhole_type,
         :count_of_passage,
         :locked,
+        :locked_reason,
         :custom_info
       ]
 
@@ -217,8 +221,11 @@ defmodule WandererApp.Api.MapConnection do
       require_atomic? false
     end
 
+    # The save-mass flag and its reason are one logical update: they are
+    # always written together by `MapServerConnectionsImpl.update_connection_locked/2`
+    # (and cleared together on unlock).
     update :update_locked do
-      accept [:locked]
+      accept [:locked, :locked_reason]
       require_atomic? false
     end
 
@@ -306,6 +313,14 @@ defmodule WandererApp.Api.MapConnection do
     end
 
     attribute :locked_at, :utc_datetime_usec do
+      public? true
+      allow_nil? true
+    end
+
+    # Why the save-mass flag was set, as entered when the link was locked.
+    # Cleared together with the lock; kept null-compatible so pre-reason locks
+    # and unlocks that never touch the reason keep working.
+    attribute :locked_reason, :string do
       public? true
       allow_nil? true
     end

@@ -1,15 +1,15 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 import classes from './SolarSystemEdge.module.scss';
 import { EdgeLabelRenderer, EdgeProps, getBezierPath, Position, useStore } from 'reactflow';
 import { getEdgeParams } from '@/hooks/Mapper/components/map/utils.ts';
 import clsx from 'clsx';
-import { ConnectionType, MassState, ShipSizeStatus, SolarSystemConnection, TimeStatus } from '@/hooks/Mapper/types';
+import { ConnectionInfoOutput, ConnectionType, MassState, OutCommand, ShipSizeStatus, SolarSystemConnection, TimeStatus } from '@/hooks/Mapper/types';
 import { PrimeIcons } from 'primereact/api';
 import { WdTooltipWrapper } from '@/hooks/Mapper/components/ui-kit/WdTooltipWrapper';
 import { useMapState } from '@/hooks/Mapper/components/map/MapProvider.tsx';
 import { SHIP_SIZES_DESCRIPTION, SHIP_SIZES_NAMES_SHORT } from '@/hooks/Mapper/components/map/constants.ts';
-import { TooltipPosition } from '@/hooks/Mapper/components/ui-kit';
+import { TimeAgo, TooltipPosition } from '@/hooks/Mapper/components/ui-kit';
 import { useRallyRoute } from '@/hooks/Mapper/hooks/useRallyRoute';
 
 const MAP_TRANSLATES: Record<string, string> = {
@@ -52,10 +52,9 @@ export const SolarSystemEdge = ({ id, source, target, markerEnd, style, data }: 
 
   const {
     data: { isThickConnections },
+    outCommand,
   } = useMapState();
 
-  const [hovered, setHovered] = useState(false);
-  
   // Check if this edge is part of the rally route
   const { highlightedConnections, isActive } = useRallyRoute();
   const connectionId = [source, target].sort().join('-');
@@ -77,6 +76,40 @@ export const SolarSystemEdge = ({ id, source, target, markerEnd, style, data }: 
 
     return [edgePath, labelX, labelY, sx, sy, tx, ty, sourcePos, targetPos];
   }, [isThickConnections, sourceNode, targetNode]);
+
+  // The lock tooltip needs who/when, which only the server knows (the edge
+  // payload carries just the flag and the reason). Fetched when the lock icon
+  // is hovered; WdTooltip re-invokes its content on every render, so the
+  // author/time appear as soon as the response lands, without re-hovering.
+  const [hovered, setHovered] = useState(false);
+  const [lockInfo, setLockInfo] = useState<ConnectionInfoOutput | null>(null);
+  const lockRequestIdRef = useRef(0);
+
+  const handleLockHoverStart = useCallback(() => {
+    setHovered(true);
+
+    if (!data?.locked) {
+      return;
+    }
+
+    const requestId = ++lockRequestIdRef.current;
+    setLockInfo(null);
+
+    outCommand<ConnectionInfoOutput>({
+      type: OutCommand.getConnectionInfo,
+      data: { from: source, to: target },
+    }).then(info => {
+      if (requestId === lockRequestIdRef.current && info) {
+        setLockInfo(info);
+      }
+    });
+  }, [outCommand, source, target, data?.locked]);
+
+  const handleLockHoverEnd = useCallback(() => {
+    setHovered(false);
+    lockRequestIdRef.current++;
+    setLockInfo(null);
+  }, []);
 
   if (!sourceNode || !targetNode || !data) {
     return null;
@@ -153,7 +186,25 @@ export const SolarSystemEdge = ({ id, source, target, markerEnd, style, data }: 
         >
           {isWormhole && data.locked && (
             <WdTooltipWrapper
-              content="Save mass"
+              onMouseEnter={handleLockHoverStart}
+              onMouseLeave={handleLockHoverEnd}
+              content={
+                <div className="flex flex-col gap-1 max-w-[240px]">
+                  <span className="font-medium text-neutral-100">Save mass</span>
+                  {data.locked_reason && (
+                    <span className="whitespace-pre-wrap break-words text-neutral-300">{data.locked_reason}</span>
+                  )}
+                  <span className="text-neutral-400">
+                    {lockInfo?.locked_by_name ? <>by {lockInfo.locked_by_name}</> : 'by someone'}
+                    {lockInfo?.locked_at && (
+                      <>
+                        {' '}
+                        <TimeAgo timestamp={lockInfo.locked_at} />
+                      </>
+                    )}
+                  </span>
+                </div>
+              }
               className={clsx(
                 classes.LinkLabel,
                 'pointer-events-auto bg-amber-300 rounded opacity-100 cursor-auto text-neutral-900',

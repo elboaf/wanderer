@@ -219,11 +219,19 @@ defmodule WandererApp.Map.Server.ConnectionsImpl do
             %{locked_at: locked_at} -> locked_at
           end
 
+        locked_reason =
+          case locked_info do
+            nil -> nil
+            %{locked_reason: locked_reason} -> locked_reason
+            _ -> nil
+          end
+
         {:ok,
          %{
            marl_eol_time: connection_mark_eol_time,
            locked_at: locked_at,
-           locked_by_name: locked_by_name
+           locked_by_name: locked_by_name,
+           locked_reason: locked_reason
          }}
 
       _ ->
@@ -303,21 +311,27 @@ defmodule WandererApp.Map.Server.ConnectionsImpl do
         map_id,
         connection_update
       ) do
-    update_connection(map_id, :update_locked, [:locked], connection_update, fn
+    update_connection(map_id, :update_locked, [:locked, :locked_reason], connection_update, fn
       %{locked: old_locked}, %{id: connection_id, locked: new_locked} = _ ->
         case new_locked do
           true ->
-            if not old_locked do
+            # `!= true` rather than `not`: rows created outside the map server
+            # can carry a NULL locked flag, and `not nil` would raise.
+            if old_locked != true do
               character_id = Map.get(connection_update, :character_id)
 
               WandererApp.Cache.put(
                 "map_#{map_id}:conn_#{connection_id}:locked_info",
-                %{locked_by_id: character_id, locked_at: DateTime.utc_now()}
+                %{
+                  locked_by_id: character_id,
+                  locked_at: DateTime.utc_now(),
+                  locked_reason: Map.get(connection_update, :locked_reason)
+                }
               )
             end
 
           _ ->
-            if old_locked do
+            if old_locked == true do
               WandererApp.Cache.delete("map_#{map_id}:conn_#{connection_id}:locked_info")
             end
         end
@@ -746,8 +760,25 @@ defmodule WandererApp.Map.Server.ConnectionsImpl do
             time_status: time_status,
             mass_status: mass_status,
             locked: locked,
+            locked_reason: get_extra_info(extra_info, "locked_reason", nil),
             wormhole_type: wormhole_type
           })
+
+        if locked do
+          # A pasted/imported document can arrive with the save-mass flag
+          # already set; seed the who/when/reason cache so hovering the lock
+          # still resolves an author. Without a character in the payload the
+          # reason travels but the author stays unknown (renders as
+          # "someone"), same as the pre-reason UI did for legacy locks.
+          WandererApp.Cache.put(
+            "map_#{map_id}:conn_#{connection.id}:locked_info",
+            %{
+              locked_by_id: character_id,
+              locked_at: DateTime.utc_now(),
+              locked_reason: get_extra_info(extra_info, "locked_reason", nil)
+            }
+          )
+        end
 
         if connection_type == @connection_type_wormhole or
              connection_type == @connection_type_loop do
@@ -1161,6 +1192,7 @@ defmodule WandererApp.Map.Server.ConnectionsImpl do
         mass_status: updated_connection.mass_status,
         time_status: updated_connection.time_status,
         locked: updated_connection.locked,
+        locked_reason: Map.get(updated_connection, :locked_reason),
         custom_info: updated_connection.custom_info
       })
 

@@ -201,6 +201,11 @@ export const Connections = ({ selectedConnection, onHide }: OnTheMapProps) => {
             <div>
               {isWormhole && info?.locked_at && (
                 <InfoDrawer title="Save Mass">
+                  {info.locked_reason && (
+                    <div className="max-w-[220px] whitespace-pre-wrap break-words text-neutral-300">
+                      {info.locked_reason}
+                    </div>
+                  )}
                   <TimeAgo timestamp={info.locked_at} />
                   {info.locked_by_name && <span className="text-neutral-400"> by {info.locked_by_name}</span>}
                 </InfoDrawer>

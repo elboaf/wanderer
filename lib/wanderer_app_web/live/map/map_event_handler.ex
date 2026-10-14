@@ -380,7 +380,7 @@ defmodule WandererAppWeb.MapEventHandler do
           type: type,
           ship_size_type: ship_size_type,
           locked: locked
-        } = _connection
+        } = connection
       ),
       do: %{
         id: "#{solar_system_source}_#{solar_system_target}",
@@ -389,6 +389,10 @@ defmodule WandererAppWeb.MapEventHandler do
         type: type,
         ship_size_type: ship_size_type,
         locked: locked,
+        # Sent with every connection payload so the map can render the
+        # save-mass lock tooltip without a round trip; nil for unlocked links
+        # and locks set before this field existed.
+        locked_reason: Map.get(connection, :locked_reason),
         source: "#{solar_system_source}",
         target: "#{solar_system_target}"
       }

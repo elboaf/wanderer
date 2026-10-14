@@ -129,7 +129,8 @@ defmodule WandererApp.Map.Operations.Transfer do
       "time_status" => connection.time_status,
       "ship_size_type" => connection.ship_size_type,
       "wormhole_type" => connection.wormhole_type,
-      "locked" => connection.locked
+      "locked" => connection.locked,
+      "locked_reason" => connection.locked_reason
     }
   end
 
@@ -237,7 +238,8 @@ defmodule WandererApp.Map.Operations.Transfer do
               "time_status",
               "ship_size_type",
               "wormhole_type",
-              "locked"
+              "locked",
+              "locked_reason"
             ])
             |> Map.merge(%{"source" => to_string(source), "target" => to_string(target)})
           ]
