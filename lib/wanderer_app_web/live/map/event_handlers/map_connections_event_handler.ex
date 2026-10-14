@@ -198,7 +198,7 @@ defmodule WandererAppWeb.MapConnectionsEventHandler do
           "source" => solar_system_source_id,
           "target" => solar_system_target_id,
           "value" => value
-        } = _event,
+        } = event,
         %{
           assigns: %{
             map_id: map_id,
@@ -246,15 +246,16 @@ defmodule WandererAppWeb.MapConnectionsEventHandler do
       value: value
     })
 
-    apply(WandererApp.Map.Server, method_atom, [
-      map_id,
+    update =
       %{
         solar_system_source_id: solar_system_source_id_int,
         solar_system_target_id: solar_system_target_id_int
       }
       |> Map.put_new(key_atom, value)
       |> Map.put(:character_id, main_character_id)
-    ])
+      |> put_connection_lock_reason(param, event)
+
+    apply(WandererApp.Map.Server, method_atom, [map_id, update])
 
     {:noreply, socket}
   end
@@ -320,6 +321,21 @@ defmodule WandererAppWeb.MapConnectionsEventHandler do
 
   def handle_ui_event(event, body, socket),
     do: MapCoreEventHandler.handle_ui_event(event, body, socket)
+
+  # The save-mass reason rides along only on the `locked` command; the client
+  # sends it in the same event so flag and reason are applied atomically.
+  defp put_connection_lock_reason("locked", event, update) when is_map(event) do
+    case event["locked_reason"] do
+      reason when is_binary(reason) ->
+        reason = String.trim(reason)
+        if reason == "", do: update, else: Map.put(update, :locked_reason, reason)
+
+      _ ->
+        update
+    end
+  end
+
+  defp put_connection_lock_reason(_param, _event, update), do: update
 
   defp get_connection_passages(map_id, from, to) do
     {:ok, passages} = WandererApp.MapChainPassagesRepo.by_connection(map_id, from, to)

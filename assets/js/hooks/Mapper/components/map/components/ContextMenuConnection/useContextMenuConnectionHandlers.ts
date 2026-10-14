@@ -108,22 +108,35 @@ export const useContextMenuConnectionHandlers = () => {
     }
   }, []);
 
-  const onToggleMassSave = useCallback((locked: boolean) => {
-    const { edge, outCommand } = ref.current;
+  const onToggleMassSave = useCallback(
+    (
+      locked: boolean,
+      reason?: string,
+      sourceTarget?: { source: string; target: string },
+    ) => {
+      const { edge, outCommand } = ref.current;
 
-    if (!edge) {
-      return;
-    }
+      // The reason dialog opens after the context menu has closed (which
+      // clears `edge`), so its Save arrives with explicit coordinates.
+      const source = sourceTarget?.source ?? edge?.source;
+      const target = sourceTarget?.target ?? edge?.target;
 
-    outCommand({
-      type: OutCommand.updateConnectionLocked,
-      data: {
-        source: edge.source,
-        target: edge.target,
-        value: locked,
-      },
-    });
-  }, []);
+      if (!source || !target) {
+        return;
+      }
+
+      outCommand({
+        type: OutCommand.updateConnectionLocked,
+        data: {
+          source,
+          target,
+          value: locked,
+          locked_reason: reason,
+        },
+      });
+    },
+    [],
+  );
 
   const onToggleLoop = useCallback(() => {
     const { edge, outCommand } = ref.current;

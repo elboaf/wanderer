@@ -3,10 +3,11 @@ import clsx from 'clsx';
 import { PrimeIcons } from 'primereact/api';
 import { ContextMenu } from 'primereact/contextmenu';
 import { MenuItem } from 'primereact/menuitem';
-import React, { RefObject, useMemo } from 'react';
+import React, { RefObject, useMemo, useState } from 'react';
 import { Edge } from 'reactflow';
 import { LifetimeActionsWrapper } from '@/hooks/Mapper/components/map/components/ContextMenuConnection/LifetimeActionsWrapper.tsx';
 import { MassStatusActionsWrapper } from '@/hooks/Mapper/components/map/components/ContextMenuConnection/MassStatusActionsWrapper.tsx';
+import { SaveMassReasonDialog } from '@/hooks/Mapper/components/map/components/ContextMenuConnection/SaveMassReasonDialog.tsx';
 import classes from './ContextMenuConnection.module.scss';
 import { getSystemStaticInfo } from '@/hooks/Mapper/mapRootProvider/hooks/useLoadSystemStatic.ts';
 import { isNullsecSpace } from '@/hooks/Mapper/components/map/helpers/isKnownSpace.ts';
@@ -18,7 +19,7 @@ export interface ContextMenuConnectionProps {
   onChangeMassState(state: MassState): void;
   onChangeShipSizeStatus(state: ShipSizeStatus): void;
   onChangeType(type: ConnectionType): void;
-  onToggleMassSave(isLocked: boolean): void;
+  onToggleMassSave(isLocked: boolean, reason?: string, sourceTarget?: { source: string; target: string }): void;
   onToggleLoop(): void;
   onHide(): void;
   edge?: Edge<SolarSystemConnection>;
@@ -36,6 +37,23 @@ export const ContextMenuConnection: React.FC<ContextMenuConnectionProps> = ({
   onHide,
   edge,
 }) => {
+  // The save-mass flag needs a reason before it is applied, so the menu item
+  // only records the pending direction here; the dialog drives the actual
+  // toggle. Unlocking stays immediate — no reason required to un-save.
+  const [pendingLock, setPendingLock] = useState<{ source: string; target: string } | null>(null);
+
+  const closeReasonDialog = () => setPendingLock(null);
+
+  const handleReasonSave = (reason: string) => {
+    if (pendingLock) {
+      // Explicit coordinates: the menu's onHide already cleared the hook's
+      // `edge` by the time the dialog's Save fires.
+      onToggleMassSave(true, reason, pendingLock);
+    }
+
+    closeReasonDialog();
+  };
+
   const items: MenuItem[] = useMemo(() => {
     if (!edge) {
       return [];
@@ -124,7 +142,14 @@ export const ContextMenuConnection: React.FC<ContextMenuConnectionProps> = ({
           [classes.ConnectionSave]: edge.data?.locked,
         }),
         icon: PrimeIcons.LOCK,
-        command: () => onToggleMassSave(!edge.data?.locked),
+        command: () => {
+          if (edge.data?.locked) {
+            onToggleMassSave(false);
+            return;
+          }
+
+          setPendingLock({ source: edge.source, target: edge.target });
+        },
       },
       ...(bothNullsec
         ? [
@@ -155,6 +180,11 @@ export const ContextMenuConnection: React.FC<ContextMenuConnectionProps> = ({
   return (
     <>
       <ContextMenu model={items} ref={contextMenuRef} onHide={onHide} breakpoint="767px" className="!w-[250px]" />
+      <SaveMassReasonDialog
+        visible={pendingLock != null}
+        onHide={closeReasonDialog}
+        onSave={handleReasonSave}
+      />
     </>
   );
 };

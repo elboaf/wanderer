@@ -75,6 +75,7 @@ defmodule WandererApp.Map.Operations.Connections do
         |> maybe_add_extra("time_status", attrs["time_status"])
         |> maybe_add_extra("mass_status", attrs["mass_status"])
         |> maybe_add_extra("locked", attrs["locked"])
+        |> maybe_add_extra("locked_reason", attrs["locked_reason"])
         |> maybe_add_extra("wormhole_type", wormhole_type)
 
       info = %{
@@ -281,7 +282,7 @@ defmodule WandererApp.Map.Operations.Connections do
       updated_attrs =
         attrs
         |> Enum.filter(fn {k, _v} ->
-          k in ["mass_status", "ship_size_type", "time_status", "type"]
+          k in ["mass_status", "ship_size_type", "time_status", "type", "locked", "locked_reason"]
         end)
         |> Enum.map(fn {k, v} -> {String.to_existing_atom(k), v} end)
         |> Enum.into(%{})
@@ -394,7 +395,10 @@ defmodule WandererApp.Map.Operations.Connections do
           "ship_size_type" -> maybe_update_ship_size_type(map_id, conn, val)
           "time_status" -> maybe_update_time_status(map_id, conn, val)
           "type" -> maybe_update_type(map_id, conn, val)
-          "locked" -> maybe_update_locked(map_id, conn, val)
+          # The reason is applied together with the flag: `locked` and
+          # `locked_reason` belong to one logical save-mass update.
+          "locked" -> maybe_update_locked(map_id, conn, val, attrs)
+          "locked_reason" -> :ok
           _ -> :ok
         end
 
@@ -450,15 +454,25 @@ defmodule WandererApp.Map.Operations.Connections do
     })
   end
 
-  defp maybe_update_locked(_map_id, _conn, nil), do: :ok
+  defp maybe_update_locked(_map_id, _conn, nil, _attrs), do: :ok
 
-  defp maybe_update_locked(map_id, conn, value) do
+  defp maybe_update_locked(map_id, conn, value, attrs) do
     Server.update_connection_locked(map_id, %{
       solar_system_source_id: conn.solar_system_source,
       solar_system_target_id: conn.solar_system_target,
-      locked: value
+      locked: value,
+      locked_reason: normalized_lock_reason(attrs["locked_reason"])
     })
   end
+
+  defp normalized_lock_reason(reason) when is_binary(reason) do
+    case String.trim(reason) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp normalized_lock_reason(_reason), do: nil
 
   @doc "Creates a connection between two systems"
   @spec create_connection(String.t(), map(), String.t()) ::

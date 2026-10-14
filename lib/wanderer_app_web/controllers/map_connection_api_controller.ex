@@ -33,6 +33,11 @@ defmodule WandererAppWeb.MapConnectionAPIController do
         nullable: true
       },
       locked: %Schema{type: :boolean, description: "Locked flag", nullable: true},
+      locked_reason: %Schema{
+        type: :string,
+        description: "Reason entered when the connection was locked (save mass)",
+        nullable: true
+      },
       custom_info: %Schema{type: :string, nullable: true, description: "Optional metadata"},
       wormhole_type: %Schema{type: :string, nullable: true, description: "Wormhole code"}
     },
@@ -45,6 +50,7 @@ defmodule WandererAppWeb.MapConnectionAPIController do
       time_status: 2,
       ship_size_type: 1,
       locked: false,
+      locked_reason: nil,
       custom_info: "Frigate only",
       wormhole_type: "C2"
     }
@@ -67,6 +73,7 @@ defmodule WandererAppWeb.MapConnectionAPIController do
             time_status: %Schema{type: :integer},
             ship_size_type: %Schema{type: :integer},
             locked: %Schema{type: :boolean},
+            locked_reason: %Schema{type: :string, nullable: true},
             custom_info: %Schema{type: :string, nullable: true},
             wormhole_type: %Schema{type: :string, nullable: true}
           }
@@ -85,6 +92,7 @@ defmodule WandererAppWeb.MapConnectionAPIController do
           time_status: 2,
           ship_size_type: 1,
           locked: false,
+          locked_reason: nil,
           custom_info: "Frigate only",
           wormhole_type: "C2"
         }
@@ -107,6 +115,7 @@ defmodule WandererAppWeb.MapConnectionAPIController do
           time_status: %Schema{type: :integer},
           ship_size_type: %Schema{type: :integer},
           locked: %Schema{type: :boolean},
+          locked_reason: %Schema{type: :string, nullable: true},
           custom_info: %Schema{type: :string, nullable: true},
           wormhole_type: %Schema{type: :string, nullable: true}
         }
@@ -123,6 +132,7 @@ defmodule WandererAppWeb.MapConnectionAPIController do
         time_status: 2,
         ship_size_type: 1,
         locked: false,
+        locked_reason: nil,
         custom_info: "Frigate only",
         wormhole_type: "C2"
       }
@@ -464,6 +474,7 @@ defmodule WandererAppWeb.MapConnectionAPIController do
       "ship_size_type",
       "time_status",
       "locked",
+      "locked_reason",
       "custom_info",
       "type"
     ]
@@ -486,6 +497,7 @@ defmodule WandererAppWeb.MapConnectionAPIController do
       "ship_size_type",
       "time_status",
       "locked",
+      "locked_reason",
       "custom_info",
       "type"
     ]
